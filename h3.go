@@ -65,6 +65,11 @@ const (
 
 	DegsToRads = math.Pi / 180.0
 	RadsToDegs = 180.0 / math.Pi
+
+	// Flags for polyfill operations
+	PolyfillModeCenter      uint32 = 0 // Cell center is contained in the shape
+	PolyfillModeFull        uint32 = 1 // Cell is fully contained in the shape
+	PolyfillModeOverlapping uint32 = 2 // Cell overlaps the shape at any point
 )
 
 type (
@@ -100,10 +105,23 @@ type (
 	// LinkedGeoPolygon is a linked-list of GeoPolygons.
 	// TODO: not implemented.
 	LinkedGeoPolygon struct{}
+
+	// PolyfillMode is uint32_t that represents the polyfill mode.
+	PolyfillMode struct {
+		mode uint32
+	}
 )
 
 func NewLatLng(lat, lng float64) LatLng {
 	return LatLng{lat, lng}
+}
+
+func NewPolyfillMode(mode uint32) PolyfillMode {
+	return PolyfillMode{mode}
+}
+
+func (p PolyfillMode) ToC() C.uint32_t {
+	return C.uint32_t(p.mode)
 }
 
 // LatLngToCell returns the Cell at resolution for a geographic coordinate.
@@ -218,7 +236,10 @@ func (c Cell) GridDiskDistances(k int) [][]Cell {
 // hexagons, tests them and their neighbors to be contained by the geoloop(s),
 // and then any newly found hexagons are used to test again until no new
 // hexagons are found.
-func PolygonToCells(polygon GeoPolygon, flags uint32, resolution int) []Cell {
+//
+// Use constants PolyfillModeCenter, PolyfillModeFull, and PolyfillModeOverlapping
+// to specify the flag. PolyfillModeCenter is the normal mode.
+func PolygonToCells(polygon GeoPolygon, flag uint32, resolution int) []Cell {
 	if len(polygon.GeoLoop) == 0 {
 		return nil
 	}
@@ -227,10 +248,10 @@ func PolygonToCells(polygon GeoPolygon, flags uint32, resolution int) []Cell {
 	defer freeCGeoPolygon(&cpoly)
 
 	maxLen := new(C.int64_t)
-	C.maxPolygonToCellsSize(&cpoly, C.int(resolution), C.uint32_t(flags), maxLen)
+	C.maxPolygonToCellsSize(&cpoly, C.int(resolution), NewPolyfillMode(flag).ToC(), maxLen)
 
 	out := make([]C.H3Index, *maxLen)
-	C.polygonToCells(&cpoly, C.int(resolution), C.uint32_t(flags), &out[0])
+	C.polygonToCells(&cpoly, C.int(resolution), NewPolyfillMode(flag).ToC(), &out[0])
 
 	return cellsFromC(out, true, false)
 }
@@ -242,8 +263,8 @@ func PolygonToCells(polygon GeoPolygon, flags uint32, resolution int) []Cell {
 // hexagons, tests them and their neighbors to be contained by the geoloop(s),
 // and then any newly found hexagons are used to test again until no new
 // hexagons are found.
-func (p GeoPolygon) Cells(flags uint32, resolution int) []Cell {
-	return PolygonToCells(p, flags, resolution)
+func (p GeoPolygon) Cells(flag uint32, resolution int) []Cell {
+	return PolygonToCells(p, flag, resolution)
 }
 
 func CellsToMultiPolygon(cells []Cell) *LinkedGeoPolygon {
