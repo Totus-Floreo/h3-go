@@ -218,7 +218,7 @@ func (c Cell) GridDiskDistances(k int) [][]Cell {
 // hexagons, tests them and their neighbors to be contained by the geoloop(s),
 // and then any newly found hexagons are used to test again until no new
 // hexagons are found.
-func PolygonToCells(polygon GeoPolygon, resolution int) []Cell {
+func PolygonToCells(polygon GeoPolygon, flags uint32, resolution int) []Cell {
 	if len(polygon.GeoLoop) == 0 {
 		return nil
 	}
@@ -227,10 +227,10 @@ func PolygonToCells(polygon GeoPolygon, resolution int) []Cell {
 	defer freeCGeoPolygon(&cpoly)
 
 	maxLen := new(C.int64_t)
-	C.maxPolygonToCellsSize(&cpoly, C.int(resolution), 0, maxLen)
+	C.maxPolygonToCellsSize(&cpoly, C.int(resolution), C.uint32_t(flags), maxLen)
 
 	out := make([]C.H3Index, *maxLen)
-	C.polygonToCells(&cpoly, C.int(resolution), 0, &out[0])
+	C.polygonToCells(&cpoly, C.int(resolution), C.uint32_t(flags), &out[0])
 
 	return cellsFromC(out, true, false)
 }
@@ -242,8 +242,8 @@ func PolygonToCells(polygon GeoPolygon, resolution int) []Cell {
 // hexagons, tests them and their neighbors to be contained by the geoloop(s),
 // and then any newly found hexagons are used to test again until no new
 // hexagons are found.
-func (p GeoPolygon) Cells(resolution int) []Cell {
-	return PolygonToCells(p, resolution)
+func (p GeoPolygon) Cells(flags uint32, resolution int) []Cell {
+	return PolygonToCells(p, flags, resolution)
 }
 
 func CellsToMultiPolygon(cells []Cell) *LinkedGeoPolygon {

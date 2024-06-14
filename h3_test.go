@@ -353,13 +353,13 @@ func TestPolygonToCells(t *testing.T) {
 
 	t.Run("empty", func(t *testing.T) {
 		t.Parallel()
-		cells := PolygonToCells(GeoPolygon{}, 6)
+		cells := PolygonToCells(GeoPolygon{}, 0, 6)
 		assertEqual(t, 0, len(cells))
 	})
 
 	t.Run("without holes", func(t *testing.T) {
 		t.Parallel()
-		cells := validGeoPolygonNoHoles.Cells(6)
+		cells := validGeoPolygonNoHoles.Cells(0, 6)
 		expectedIndexes := []Cell{
 			0x860dab607ffffff,
 			0x860dab60fffffff,
@@ -374,7 +374,7 @@ func TestPolygonToCells(t *testing.T) {
 
 	t.Run("with hole", func(t *testing.T) {
 		t.Parallel()
-		cells := validGeoPolygonHoles.Cells(6)
+		cells := validGeoPolygonHoles.Cells(0, 6)
 		expectedIndexes := []Cell{
 			0x860dab60fffffff,
 			0x860dab617ffffff,

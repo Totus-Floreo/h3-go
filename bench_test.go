@@ -54,6 +54,6 @@ func BenchmarkHexRange(b *testing.B) {
 
 func BenchmarkPolyfill(b *testing.B) {
 	for n := 0; n < b.N; n++ {
-		cells = PolygonToCells(validGeoPolygonHoles, 15)
+		cells = PolygonToCells(validGeoPolygonHoles, 0, 15)
 	}
 }
