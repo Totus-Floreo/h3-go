@@ -25,6 +25,7 @@ package h3
 #include <stdlib.h>
 #include <h3_h3api.h>
 #include <h3_h3Index.h>
+#include <h3_polyfill.h>
 */
 import "C"
 
@@ -67,9 +68,10 @@ const (
 	RadsToDegs = 180.0 / math.Pi
 
 	// Flags for polyfill operations
-	PolyfillModeCenter      uint32 = 0 // Cell center is contained in the shape
-	PolyfillModeFull        uint32 = 1 // Cell is fully contained in the shape
-	PolyfillModeOverlapping uint32 = 2 // Cell overlaps the shape at any point
+	PolyfillModeCenter          uint32 = 0 // Cell center is contained in the shape
+	PolyfillModeFull            uint32 = 1 // Cell is fully contained in the shape
+	PolyfillModeOverlapping     uint32 = 2 // Cell overlaps the shape at any point
+	PolyfillModeOverlappingBbox uint32 = 3 // Cell bounding box overlaps shape
 )
 
 type (
@@ -229,17 +231,15 @@ func (c Cell) GridDiskDistances(k int) [][]Cell {
 	return GridDiskDistances(c, k)
 }
 
-// PolygonToCells takes a given GeoJSON-like data structure fills it with the
+// PolygonToCellsExperimental takes a given GeoJSON-like data structure fills it with the
 // hexagon cells that are contained by the GeoJSON-like data structure.
 //
-// This implementation traces the GeoJSON geoloop(s) in cartesian space with
-// hexagons, tests them and their neighbors to be contained by the geoloop(s),
-// and then any newly found hexagons are used to test again until no new
-// hexagons are found.
+// This function similar to PolygonToCells, but it uses a different algorithm
+// from the H3-Core master branch. This function is experimental and may be carefully
 //
 // Use constants PolyfillModeCenter, PolyfillModeFull, and PolyfillModeOverlapping
 // to specify the flag. PolyfillModeCenter is the normal mode.
-func PolygonToCells(polygon GeoPolygon, flag uint32, resolution int) []Cell {
+func PolygonToCellsExperimental(polygon GeoPolygon, flag uint32, resolution int) []Cell {
 	if len(polygon.GeoLoop) == 0 {
 		return nil
 	}
@@ -248,10 +248,10 @@ func PolygonToCells(polygon GeoPolygon, flag uint32, resolution int) []Cell {
 	defer freeCGeoPolygon(&cpoly)
 
 	maxLen := new(C.int64_t)
-	C.maxPolygonToCellsSize(&cpoly, C.int(resolution), NewPolyfillMode(flag).ToC(), maxLen)
+	C.maxPolygonToCellsSizeExperimental(&cpoly, C.int(resolution), NewPolyfillMode(flag).ToC(), maxLen)
 
 	out := make([]C.H3Index, *maxLen)
-	C.polygonToCells(&cpoly, C.int(resolution), NewPolyfillMode(flag).ToC(), &out[0])
+	C.polygonToCellsExperimental(&cpoly, C.int(resolution), NewPolyfillMode(flag).ToC(), &out[0])
 
 	return cellsFromC(out, true, false)
 }
@@ -263,8 +263,44 @@ func PolygonToCells(polygon GeoPolygon, flag uint32, resolution int) []Cell {
 // hexagons, tests them and their neighbors to be contained by the geoloop(s),
 // and then any newly found hexagons are used to test again until no new
 // hexagons are found.
-func (p GeoPolygon) Cells(flag uint32, resolution int) []Cell {
-	return PolygonToCells(p, flag, resolution)
+func PolygonToCells(polygon GeoPolygon, resolution int) []Cell {
+	if len(polygon.GeoLoop) == 0 {
+		return nil
+	}
+	cpoly := allocCGeoPolygon(polygon)
+
+	defer freeCGeoPolygon(&cpoly)
+
+	maxLen := new(C.int64_t)
+	C.maxPolygonToCellsSize(&cpoly, C.int(resolution), maxLen)
+
+	out := make([]C.H3Index, *maxLen)
+	C.polygonToCells(&cpoly, C.int(resolution), &out[0])
+
+	return cellsFromC(out, true, false)
+}
+
+// PolygonToCells takes a given GeoJSON-like data structure fills it with the
+// hexagon cells that are contained by the GeoJSON-like data structure.
+//
+// This implementation traces the GeoJSON geoloop(s) in cartesian space with
+// hexagons, tests them and their neighbors to be contained by the geoloop(s),
+// and then any newly found hexagons are used to test again until no new
+// hexagons are found.
+func (p GeoPolygon) Cells(resolution int) []Cell {
+	return PolygonToCells(p, resolution)
+}
+
+// PolygonToCellsExperimental takes a given GeoJSON-like data structure fills it with the
+// hexagon cells that are contained by the GeoJSON-like data structure.
+//
+// This function similar to PolygonToCells, but it uses a different algorithm
+// from the H3-Core master branch. This function is experimental and may be carefully
+//
+// Use constants PolyfillModeCenter, PolyfillModeFull, and PolyfillModeOverlapping
+// to specify the flag. PolyfillModeCenter is the normal mode.
+func (p GeoPolygon) CellsExperimental(flag uint32, resolution int) []Cell {
+	return PolygonToCellsExperimental(p, flag, resolution)
 }
 
 func CellsToMultiPolygon(cells []Cell) *LinkedGeoPolygon {
