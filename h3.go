@@ -272,10 +272,10 @@ func PolygonToCells(polygon GeoPolygon, resolution int) []Cell {
 	defer freeCGeoPolygon(&cpoly)
 
 	maxLen := new(C.int64_t)
-	C.maxPolygonToCellsSize(&cpoly, C.int(resolution), maxLen)
+	C.maxPolygonToCellsSize(&cpoly, C.int(resolution), 0, maxLen)
 
 	out := make([]C.H3Index, *maxLen)
-	C.polygonToCells(&cpoly, C.int(resolution), &out[0])
+	C.polygonToCells(&cpoly, C.int(resolution), 0, &out[0])
 
 	return cellsFromC(out, true, false)
 }
